@@ -16,39 +16,71 @@ const loadDrawingFromStorage = (): Drawing | null => {
 
 type StoredScene = { drawing: Drawing; duration?: number };
 
-export const loadStorage = async (): Promise<Scene[] | null> => {
+type StoredData =
+  | StoredScene[]
+  | { scenes: StoredScene[]; sceneSize?: { width: number; height: number } };
+
+export const loadStorage = async (): Promise<{
+  scenes: Scene[];
+  sceneSize?: { width: number; height: number };
+} | null> => {
   try {
     const stored = localStorage.getItem(SCENE_STORAGE_KEY) || '';
-    const parsed =
-      stored && stored.length > 0
-        ? (JSON.parse(stored) as StoredScene[] | Drawing[])
-        : undefined;
-    if (parsed && parsed.length > 0) {
-      const storedScenes: StoredScene[] = parsed.map((item) =>
-        'drawing' in item ? item : { drawing: item as Drawing },
-      );
-      let firstScene: Scene | undefined;
-      const scenes: Scene[] = [];
-      for (const { drawing, duration } of storedScenes) {
-        drawing.appState.collaborators = new Map();
-        const scene = await createScene(
-          drawing,
-          firstScene
-            ? { width: firstScene.width, height: firstScene.height }
-            : undefined,
-        );
-        if (scene) {
-          if (duration !== undefined) {
-            scene.duration = duration;
-          }
-          if (!firstScene) {
-            firstScene = scene;
-          }
-          scenes.push(scene);
+    const parsed: StoredData | undefined =
+      stored && stored.length > 0 ? JSON.parse(stored) : undefined;
+
+    if (!parsed) return null;
+
+    const storedScenes: StoredScene[] = Array.isArray(parsed)
+      ? parsed
+      : parsed.scenes;
+
+    // Migration: old format stored sceneSize in a separate key
+    let sceneSize: { width: number; height: number } | undefined =
+      Array.isArray(parsed) ? undefined : parsed.sceneSize;
+    if (Array.isArray(parsed)) {
+      try {
+        const legacySize = localStorage.getItem('claymate-scene-size');
+        if (legacySize) {
+          sceneSize = JSON.parse(legacySize) as {
+            width: number;
+            height: number;
+          };
+          localStorage.removeItem('claymate-scene-size');
         }
+      } catch {
+        /* empty */
       }
-      return scenes;
     }
+
+    if (!storedScenes || storedScenes.length === 0) return null;
+
+    const normalizedScenes: StoredScene[] = storedScenes.map((item) =>
+      'drawing' in item ? item : { drawing: item as Drawing },
+    );
+
+    let firstScene: Scene | undefined;
+    const scenes: Scene[] = [];
+    for (const { drawing, duration } of normalizedScenes) {
+      drawing.appState.collaborators = new Map();
+      const scene = await createScene(
+        drawing,
+        sceneSize ??
+          (firstScene
+            ? { width: firstScene.width, height: firstScene.height }
+            : undefined),
+      );
+      if (scene) {
+        if (duration !== undefined) {
+          scene.duration = duration;
+        }
+        if (!firstScene) {
+          firstScene = scene;
+        }
+        scenes.push(scene);
+      }
+    }
+    return { scenes, sceneSize };
   } catch (e) {
     console.error('Error loading from storage', e);
     try {
@@ -56,7 +88,7 @@ export const loadStorage = async (): Promise<Scene[] | null> => {
       if (drawing) {
         const scene = await createScene(drawing);
         if (scene) {
-          return [scene];
+          return { scenes: [scene] };
         }
       }
     } catch {
@@ -66,9 +98,13 @@ export const loadStorage = async (): Promise<Scene[] | null> => {
   return null;
 };
 
-export const saveStorage = (scenes: Scene[]) => {
-  const result = JSON.stringify(
-    scenes.map((s) => ({ drawing: s.drawing, duration: s.duration })),
-  );
+export const saveStorage = (
+  scenes: Scene[],
+  sceneSize?: { width: number; height: number },
+) => {
+  const result = JSON.stringify({
+    scenes: scenes.map((s) => ({ drawing: s.drawing, duration: s.duration })),
+    ...(sceneSize && { sceneSize }),
+  });
   localStorage.setItem(SCENE_STORAGE_KEY, result);
 };

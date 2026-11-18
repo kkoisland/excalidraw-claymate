@@ -13,17 +13,16 @@ export const importScenes = async () => {
     if (typeof parsed !== 'object' || parsed === null) {
       throw new Error('Invalid JSON structure');
     }
-    Object.entries(parsed as Record<string, unknown>).forEach(
-      ([key, value]) => {
-        if (typeof value === 'string') {
-          localStorage.setItem(key, value);
-        } else {
-          localStorage.setItem(key, JSON.stringify(value));
-        }
-      },
-    );
-    const scenes = await loadStorage();
-    if (!scenes || scenes.length === 0) {
+    const parsedObj = parsed as Record<string, unknown>;
+    Object.entries(parsedObj).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        localStorage.setItem(key, value);
+      } else {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
+    });
+    const loaded = await loadStorage();
+    if (!loaded || loaded.scenes.length === 0) {
       window.alert('No scenes found in the imported file.');
       return;
     }

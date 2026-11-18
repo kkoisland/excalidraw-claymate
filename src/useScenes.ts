@@ -21,6 +21,9 @@ export const useScenes = () => {
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(0);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [drawing, setDrawing] = useState<Drawing | undefined>();
+  const [sceneSize, setSceneSize] = useState<
+    { width: number; height: number } | undefined
+  >(undefined);
 
   const currentScene =
     currentIndex !== undefined && currentIndex < scenes.length
@@ -29,7 +32,10 @@ export const useScenes = () => {
 
   let requiredWidth: number | undefined;
   let requiredHeight: number | undefined;
-  if (currentScene != null && scenes.length !== 1) {
+  if (sceneSize) {
+    requiredWidth = sceneSize.width;
+    requiredHeight = sceneSize.height;
+  } else if (currentScene != null && scenes.length !== 1) {
     requiredWidth = currentScene.width;
     requiredHeight = currentScene.height;
   }
@@ -38,7 +44,7 @@ export const useScenes = () => {
     (
       drawing: Drawing,
       index: number,
-      updateCurrent: (index: number, drawing: Drawing) => void,
+      updateCurrent: ((index: number, drawing: Drawing) => void) | undefined,
     ) => {
       setDrawingVersion((version) => version + 1);
       setDrawing(drawing);
@@ -134,10 +140,11 @@ export const useScenes = () => {
         (async () => {
           const scene = await createScene(
             drawingToAdd,
-            scenes[0] && {
-              width: scenes[0].width,
-              height: scenes[0].height,
-            },
+            sceneSize ??
+              (scenes[0] && {
+                width: scenes[0].width,
+                height: scenes[0].height,
+              }),
           );
           if (generationRef.current !== generation) return;
           if (scene) {
@@ -149,7 +156,29 @@ export const useScenes = () => {
         })();
       }
     },
-    [updateScenes, scenes, drawing],
+    [updateScenes, scenes, drawing, sceneSize],
+  );
+
+  const updateSceneSize = useCallback(
+    (size: { width: number; height: number }) => {
+      generationRef.current += 1;
+      const generation = generationRef.current;
+      (async () => {
+        const newScenes: Scene[] = [];
+        for (const scene of scenes) {
+          const newScene = await createScene(scene.drawing, size);
+          if (generationRef.current !== generation) return;
+          if (newScene) {
+            newScene.duration = scene.duration;
+            newScenes.push(newScene);
+          }
+        }
+        if (generationRef.current !== generation) return;
+        setSceneSize(size);
+        setScenes(newScenes);
+      })();
+    },
+    [scenes],
   );
 
   const clearScenes = useCallback(() => {
@@ -172,6 +201,7 @@ export const useScenes = () => {
       duration: DEFAULT_DURATION,
     };
     setScenes(() => [finalScene]);
+    setSceneSize(undefined);
     setCurrentIndex(0);
     setDrawing(blankDrawing);
     setDrawingVersion((v) => v + 1);
@@ -181,11 +211,14 @@ export const useScenes = () => {
     if (initialisedRef.current === Initialisation.NotStarted) {
       initialisedRef.current = Initialisation.Started;
       (async () => {
-        const initialScenes = await loadStorage();
-        if (initialScenes && initialScenes.length > 0) {
-          setScenes(initialScenes);
+        const loaded = await loadStorage();
+        if (loaded && loaded.scenes.length > 0) {
+          if (loaded.sceneSize) {
+            setSceneSize(loaded.sceneSize);
+          }
+          setScenes(loaded.scenes);
           setCurrentIndex(0);
-          onRestore(initialScenes[0].drawing, 0, updateCurrentScene);
+          onRestore(loaded.scenes[0].drawing, 0, undefined);
         } else {
           addScene();
         }
@@ -196,9 +229,9 @@ export const useScenes = () => {
 
   useEffect(() => {
     if (initialisedRef.current === Initialisation.Complete) {
-      saveStorage(scenes);
+      saveStorage(scenes, sceneSize);
     }
-  }, [scenes]);
+  }, [scenes, sceneSize]);
 
   return {
     moveToScene,
@@ -209,6 +242,8 @@ export const useScenes = () => {
     currentIndex,
     scenes,
     updateScenes,
+    sceneSize,
+    updateSceneSize,
     initialData: drawing,
   };
 };

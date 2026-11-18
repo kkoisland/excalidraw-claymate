@@ -19,6 +19,8 @@ const App = () => {
     initialData: initialSceneData,
     scenes,
     updateScenes,
+    sceneSize,
+    updateSceneSize,
   } = useScenes();
 
   const { onLibraryChange, libraryItems } = useLibrary();
@@ -49,6 +51,8 @@ const App = () => {
         moveToScene={moveToScene}
         addScene={addScene}
         clearScenes={clearScenes}
+        sceneSize={sceneSize}
+        updateSceneSize={updateSceneSize}
       />
     </div>
   );

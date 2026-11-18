@@ -3,6 +3,7 @@ import type { AppState, BinaryFiles } from '@excalidraw/excalidraw/types';
 
 export const DEFAULT_DURATION = 500;
 export const LAST_SCENE_EXTRA_DURATION = 1500;
+export const DEFAULT_SCENE_SIZE = { width: 800, height: 600 };
 
 export type Drawing = {
   elements: ExcalidrawElement[];

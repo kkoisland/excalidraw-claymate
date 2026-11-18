@@ -9,7 +9,7 @@ import {
 import { isEmpty } from 'lodash';
 
 import './Claymate.css';
-import { DEFAULT_DURATION } from './types';
+import { DEFAULT_DURATION, DEFAULT_SCENE_SIZE } from './types';
 import type { Drawing, Scene } from './types';
 import { exportToGif } from './exportToGif';
 import { exportToHtml } from './exportToHtml';
@@ -65,6 +65,8 @@ type Props = {
   addScene: (optionalDrawing?: Drawing) => void;
   clearScenes: () => void;
   autoAddSceneUnit?: number;
+  sceneSize?: { width: number; height: number };
+  updateSceneSize: (size: { width: number; height: number }) => void;
 };
 
 type PreviewState = {
@@ -85,6 +87,8 @@ const Claymate = ({
   addScene,
   clearScenes,
   autoAddSceneUnit = 0.1,
+  sceneSize,
+  updateSceneSize,
 }: Props) => {
   const [previewState, setPreviewState] = useState<PreviewState>({
     open: false,
@@ -95,6 +99,11 @@ const Claymate = ({
   const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] =
     useState(false);
   const [showAutoSceneConfig, setShowAutoSceneConfig] = useState(false);
+  const [showSceneSizeDialog, setShowSceneSizeDialog] = useState(false);
+  const [pendingSize, setPendingSize] = useState(DEFAULT_SCENE_SIZE);
+  const [isSizeValid, setIsSizeValid] = useState(true);
+  const pendingWidthRef = useRef<HTMLInputElement>(null);
+  const pendingHeightRef = useRef<HTMLInputElement>(null);
   const [autoSceneConfig, setAutoSceneConfig] = useState<AutoSceneConfig>({
     enabled: false,
     frequency: 50,
@@ -440,6 +449,22 @@ const Claymate = ({
             )}
             Add scene
           </button>
+          <button
+            type="button"
+            title="Set scene size"
+            onClick={() => {
+              setPendingSize(
+                sceneSize ?? {
+                  width: scenes[0]?.width ?? DEFAULT_SCENE_SIZE.width,
+                  height: scenes[0]?.height ?? DEFAULT_SCENE_SIZE.height,
+                },
+              );
+              setIsSizeValid(true);
+              setShowSceneSizeDialog(true);
+            }}
+          >
+            Scene size
+          </button>
         </div>
         <div className="flex">
           <button
@@ -586,6 +611,75 @@ const Claymate = ({
             Clear {selectedIds.size} selected scene
             {selectedIds.size > 1 ? 's' : ''}?
           </p>
+        </Dialog>
+      )}
+
+      {/* Scene size Dialog */}
+      {showSceneSizeDialog && (
+        <Dialog
+          open={showSceneSizeDialog}
+          title="Scene size"
+          handleClose={() => setShowSceneSizeDialog(false)}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowSceneSizeDialog(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!isSizeValid}
+                onClick={() => {
+                  const w = Number(pendingWidthRef.current?.value);
+                  const h = Number(pendingHeightRef.current?.value);
+                  if (w > 0 && h > 0) {
+                    updateSceneSize({ width: w, height: h });
+                    setShowSceneSizeDialog(false);
+                  }
+                }}
+              >
+                Apply
+              </button>
+            </>
+          }
+        >
+          <div className="Claymate-scene-size-fields">
+            <label htmlFor="sceneSizeWidth">width</label>
+            <input
+              ref={pendingWidthRef}
+              id="sceneSizeWidth"
+              type="number"
+              min={100}
+              step={10}
+              defaultValue={pendingSize.width}
+              onChange={() =>
+                setIsSizeValid(
+                  Number(pendingWidthRef.current?.value) > 0 &&
+                    Number(pendingHeightRef.current?.value) > 0,
+                )
+              }
+            />
+            <span>px</span>
+            <label htmlFor="sceneSizeHeight">height</label>
+            <input
+              ref={pendingHeightRef}
+              id="sceneSizeHeight"
+              type="number"
+              min={100}
+              step={10}
+              defaultValue={pendingSize.height}
+              onChange={() =>
+                setIsSizeValid(
+                  Number(pendingWidthRef.current?.value) > 0 &&
+                    Number(pendingHeightRef.current?.value) > 0,
+                )
+              }
+            />
+            <span>px</span>
+          </div>
+          This size applies to all scenes.
         </Dialog>
       )}
     </div>

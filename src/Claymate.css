@@ -209,3 +209,17 @@
 .text-nobreak {
   white-space: nowrap;
 }
+
+.Claymate-scene-size-fields {
+  display: grid;
+  grid-template-columns: 1fr 80px auto;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 8px;
+}
+
+.Claymate-scene-size-fields input {
+  padding: 2px 4px;
+  border: 1px solid #ced4da;
+  border-radius: 3px;
+}
